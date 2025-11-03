@@ -1,0 +1,12 @@
+BYBIT DAILY • 2025-10-28
+Symbol: BTCUSDT
+Realisierte PnL (24h): -403.39 (USDT)
+Fills (24h): 2
+Alerts heute: 0
+Forecast-Qualität: keine Prognosen
+Chart: /Users/ronnygiger/Desktop/bybit_bot_skeleton/reports/daily-2025-10-28.png
+
+Empfehlungen:
+- Hohe Alert-Anzahl? -> API/Netz prüfen, ggf. Rate-Limits.
+- Negative PnL + viele Fills? -> Slippage/Fees prüfen, Positionsgröße anpassen.
+- Forecast-Hit-Rate < 55%? -> Regel justieren (Signalfilter, Timeframe, Stop/TP).

@@ -1,0 +1,7 @@
+pybit
+pandas
+numpy
+python-dotenv
+pydantic
+loguru
+websocket-client
