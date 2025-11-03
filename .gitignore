@@ -1,0 +1,10 @@
+.venv/
+runs/
+logs/
+*.log
+*.err
+*.out
+# optional, wenn die Files im Root läbe
+guard.log
+autorun.err
+autorun.out
