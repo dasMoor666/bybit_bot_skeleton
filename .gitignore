@@ -23,3 +23,5 @@ __pycache__/
 guard.log
 autorun.err
 autorun.out
+
+!.env.example

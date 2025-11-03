@@ -34,3 +34,5 @@ data/             # Optionale CSV-Kerzen (Symbol_5m.csv)
 ## TODO (für echte Orders)
 - In `broker.py` die Abschnitte mit `# TODO: REAL ORDER` aktivieren und `pybit`-Client anlegen (Testnet-Endpunkte).
 - In `data.py` WebSocket-Subscribe für 5m-Klines (Testnet) implementieren.
+- TODO: Signal-Logik feinschleifen
+- TODO: Signal-Logik feinschleifen
