@@ -1,10 +1,25 @@
+# Virtualenv & Python-Cache
 .venv/
-runs/
-logs/
+__pycache__/
+*.pyc
+
+# Secrets & lokale Configs
+.env
+.env.*
+
+# Logs / Runs: Inhalt ignorieren, .gitkeep behalten
+/logs/*
+!/logs/.gitkeep
+/runs/*
+!/runs/.gitkeep
+
+# Generische Artefakte
 *.log
 *.err
 *.out
-# optional, wenn die Files im Root läbe
+.DS_Store
+
+# Einzeldinger im Root (falls sie mal auftauchen)
 guard.log
 autorun.err
 autorun.out
