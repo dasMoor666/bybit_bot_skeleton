@@ -14,48 +14,9 @@ __pycache__/
 *secret*
 *token*
 *apikey*
-
-# Logs / Runs: Inhalt ignorieren, .gitkeep behalten
-/logs/*
-!/logs/.gitkeep
-/runs/*
-!/runs/.gitkeep
-
-# Legacy-Verzeichnis (wird ignoriert, nicht getrackt)
-90_LEGACY/
-
-# Generische Artefakte
-*.log
-*.err
-*.out
-.DS_Store
-
-# Einzeldinger im Root (falls sie mal auftauchen)
-guard.log
-autorun.err
-autorun.out
-
 !.env.example
 
-# --- SELMA: SAFETY IGNORE (TradingBot) ---
-# secrets
-.env
-.env.*
-*.key
-*.pem
-*.p12
-*.pfx
-*secret*
-*token*
-*apikey*
-
-# local env / caches
-.venv/
-__pycache__/
-*.pyc
-.pytest_cache/
-
-# artifacts (do not version)
+# Logs / Runs: als Artefakte behandeln (nicht versionieren)
 logs/
 runs/
 *.out
@@ -65,6 +26,15 @@ runs/
 # macOS
 .DS_Store
 
+# Legacy/Quarantäne (lokal, nicht tracken)
+90_LEGACY/
+
+# Root-Artefakte (falls sie auftauchen)
+guard.log
+autorun.err
+autorun.out
+
 # 00_GOV: Backup- und Snapshot-Dateien ignorieren
 00_GOV/.gitignore.backup_*
 00_GOV/snapshot_*.txt
+00_GOV/.gitignore.before_fix_*
