@@ -2,16 +2,27 @@
 .venv/
 __pycache__/
 *.pyc
+.pytest_cache/
 
 # Secrets & lokale Configs
 .env
 .env.*
+*.key
+*.pem
+*.p12
+*.pfx
+*secret*
+*token*
+*apikey*
 
 # Logs / Runs: Inhalt ignorieren, .gitkeep behalten
 /logs/*
 !/logs/.gitkeep
 /runs/*
 !/runs/.gitkeep
+
+# Legacy-Verzeichnis (wird ignoriert, nicht getrackt)
+90_LEGACY/
 
 # Generische Artefakte
 *.log
@@ -25,3 +36,35 @@ autorun.err
 autorun.out
 
 !.env.example
+
+# --- SELMA: SAFETY IGNORE (TradingBot) ---
+# secrets
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx
+*secret*
+*token*
+*apikey*
+
+# local env / caches
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# artifacts (do not version)
+logs/
+runs/
+*.out
+*.err
+*.log
+
+# macOS
+.DS_Store
+
+# 00_GOV: Backup- und Snapshot-Dateien ignorieren
+00_GOV/.gitignore.backup_*
+00_GOV/snapshot_*.txt
