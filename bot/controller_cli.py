@@ -29,7 +29,7 @@ def _safe_bool_env(name: str) -> Optional[bool]:
     v = os.getenv(name)
     if v is None:
         return None
-    v = v.strip().lowr()
+    v = v.strip().lower()
     if v in {"1", "true", "yes", "y", "on"}:
         return True
     if v in {"0", "false", "no", "n", "off"}:
@@ -89,9 +89,17 @@ def _load_settings_summary() -> Dict[str, Any]:
 
 
 def _http_get_json(url: str, timeout_s: int = 10) -> Dict[str, Any]:
-    """Public GET helper. No auth. No secrets."""
+    """Public GET helper. No auth. No secrets. SSL uses certifi if available."""
     try:
         import urllib.request
+        import ssl
+
+        # Robust SSL: prefer certifi CA bundle, fallback to system default
+        try:
+            import certifi  # type: gnore
+            ctx = ssl.create_default_context(cafile=certifi.where())
+        except Exception:
+            ctx = ssl.create_default_context()
 
         req = urllib.request.Request(
             url,
@@ -101,7 +109,7 @@ def _http_get_json(url: str, timeout_s: int = 10) -> Dict[str, Any]:
             },
             method="GET",
         )
-        with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+        with urllib.request.urlopen(req, timeout=timeout_s, context=ctx) as resp:
             status = getattr(resp, "status", 200)
             raw = resp.read().decode("utf-8", errors="replace")
 
@@ -114,8 +122,6 @@ def _http_get_json(url: str, timeout_s: int = 10) -> Dict[str, Any]:
 
     except Exception as e:
         return {"ok": False, "error": f"{type(e).__name__}: {e}", "url": url}
-
-
 def cmd_healthcheck(_: argparse.Namespace) -> int:
     data: Dict[str, Any] = {
         "python": sys.version.split()[0],
