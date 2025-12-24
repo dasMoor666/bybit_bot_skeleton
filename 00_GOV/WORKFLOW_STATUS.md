@@ -1,10 +1,10 @@
 # WORKFLOW STATUS — TradingBot (Crypto)
 
 ## Aktive Phase
-**Phase 0B — Controller-Core minimal (deterministisch, auditierbar, NO-TRADE)**
+**Phase 0B — Controller-Core (deterministisch, auditierbar, NO-TRADE, Read-only Testnet OK)**
 
 ## Modus / Safety-Gates
-- Default-Modus: **DRY_RUN / Paper / Testnet**
+- Default-Modus: **NO-TRADE / DRY_RUN / Testnet**
 - Live-Trading (Mainnet): **GESPERRT**, bis Safety-Gates erfüllt und explizit freigeschaltet
 - Secrets: **niemals** im Repo/Chat/Logs; nur `.env` lokal + `.env.example` ohne echte Werte
 - Cursor/Agent: **Manual/Review only**, kein Auto-Apply
@@ -15,23 +15,27 @@
 - Host/Port (falls relevant): _—_
 
 ## Letzter erfolgreicher Verify
-- Befehl:
+- Befehle:
   - `python -m py_compile bot/controller_cli.py`
-  - `python bot/controller_cli.py healthcheck`
+  - `python bot/controller_cli.py get_state --symbol BTCUSDT --category l`python bot/controller_cli.py get_candles --symbol BTCUSDT --category linear --interval 15 --limit 5`
+  - `python bot/controller_cli.py analyze --symbol BTCUSDT --category linear --interval 15 --limit 200`
 - Ergebnis (kurz):
-  - Controller CLI läuft, gibt JSON aus, keine Secrets
+  - Bybit **Testnet** erreichbar (HTTP 200), Read-only State/Candles/Analyse liefern JSON, keine Secrets
 - Datum:
-  - 2025-12-23
+  - 2025-12-24
 
 ## Stand (kurz)
-- Phase 0A abgeschlossen: `00_GOV/` + Repo-Hygiene
-- Phase 0B gestartet:
-  - `02_CONTROLLER/README.md`
+- Phase 0A abgeschlossen:
+  - `00_GOV/` Baseline + Repo-Hygiene
+- Phase 0B abgeschlossen (stabil):
+  - `bot/controller_cli.py`:
+    - `healthcheck`, `get_state`, `get_candles`, `analyze`, `dry_run`
+    - SSL robust (certifi), Output deterministisch (JSON)
+  - `requirements.lock` vorhanden (reproduzierbarer Env-Stand)
 
-## Nächster Schritt
-- Controller-Wiring (read-only): `get_state` erweitert um echte Exchange-State-Abfrage (nur GET, kein Order-Posting)
-- Dependency-Baseline: requirements/lock + reproduzierbarer venv-Setup
+## Nächster Schritt (genau 1 Punkt)
+- **Phase 0C starten:** Private **read-only** Testnet-Checks (Balance/Positions), weiterhin **NO-TRADE**, keine Secrets im Output
 
 ## Blocker / Risiken
-- Abhängigkeiten in venv können “driften” → wir brauchen reproduzierbare Install-Schritte
-- Live-Trading bleibt gesperrt, bis Safety-Gates schriftlich erfüllt sind
+- Import-Side-Effects in Legacy-Modulen möglich (z.B. Logs beim Import) → später entkoppeln
+- Live-Trading bleibt gesperrt, bis Safety-Gathriftlich erfüllt sind
