@@ -24,7 +24,7 @@ def _utc_iso() -> str:
 
 
 def _print_json(obj: Dict[str, Any]) -> None:
-    sys.stdout.write(json.dumps(obj, ensure_asciiFalse) + "\n")
+    sys.stdout.write(json.dumps(obj, ensure_ascii=False) + "\n")
 
 
 def _safe_bool_env(name: str) -> Optional[bool]:
