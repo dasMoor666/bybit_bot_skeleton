@@ -3,6 +3,8 @@
 Minimal Controller CLI (Phase 0B)
 - healthcheck: runtime/import/config check
 - get_state: READ-ONLY public Bybit GETs (no auth, no orders)
+- get_candles: READ-ONLY public Bybit Kline (no auth, no orders)
+- analyze: READ-ONLY technical analysis on public candles (SMA/RSI), no trading
 - dry_run: validate + log an order intent (no execution)
 """
 
@@ -14,7 +16,7 @@ import os
 import sys
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 
 def _utc_iso() -> str:
@@ -22,7 +24,7 @@ def _utc_iso() -> str:
 
 
 def _print_json(obj: Dict[str, Any]) -> None:
-    sys.stdout.write(json.dumps(obj, ensure_ascii=False) + "\n")
+    sys.stdout.write(json.dumps(obj, ensure_asciiFalse) + "\n")
 
 
 def _safe_bool_env(name: str) -> Optional[bool]:
@@ -88,6 +90,19 @@ def _load_settings_summary() -> Dict[str, Any]:
     return summary
 
 
+def _public_base_url(settings: Dict[str, Any]) -> str:
+    # Decide public base URL (no auth)
+    testnet_flag = None
+    for key in ("bybit_testnet", "testnet"):
+        if isinstance(settings.get(key), bool):
+            testnet_flag = settings.get(key)
+            break
+    if testnet_flag is None:
+        testnet_flag = settings.get("env_flags", {}).get("TESTNET") is True
+
+    return "https://api-testnet.bybit.com" if testnet_flag else "https://api.bybit.com"
+
+
 def _http_get_json(url: str, timeout_s: int = 10) -> Dict[str, Any]:
     """Public GET helper. No auth. No secrets. SSL uses certifi if available."""
     try:
@@ -96,7 +111,7 @@ def _http_get_json(url: str, timeout_s: int = 10) -> Dict[str, Any]:
 
         # Robust SSL: prefer certifi CA bundle, fallback to system default
         try:
-            import certifi  # type: gnore
+            import certifi  # type: ignore
             ctx = ssl.create_default_context(cafile=certifi.where())
         except Exception:
             ctx = ssl.create_default_context()
@@ -122,6 +137,8 @@ def _http_get_json(url: str, timeout_s: int = 10) -> Dict[str, Any]:
 
     except Exception as e:
         return {"ok": False, "error": f"{type(e).__name__}: {e}", "url": url}
+
+
 def cmd_healthcheck(_: argparse.Namespace) -> int:
     data: Dict[str, Any] = {
         "python": sys.version.split()[0],
@@ -130,7 +147,7 @@ def cmd_healthcheck(_: argparse.Namespace) -> int:
         "imports": {},
     }
 
-    # Import probes (no side effects intended)
+    # Import probes (may have side effects in legacy modules; still useful)
     for mod in ["bot", "bot.config", "bot.run"]:
         try:
             __import__(mod)
@@ -145,17 +162,7 @@ def cmd_healthcheck(_: argparse.Namespace) -> int:
 
 def cmd_get_state(args: argparse.Namespace) -> int:
     settings = _load_settings_summary()
-
-    # Decide public base URL (no auth)
-    testnet_flag = None
-    for key in ("bybit_testnet", "testnet"):
-        if isinstance(settings.get(key), bool):
-            testnet_flag = settings.get(key)
-            break
-    if testnet_flag is None:
-        testnet_flag = settings.get("env_flags", {}).get("TESTNET") is True
-
-    base_url = "https://api-testnet.bybit.com" if testnet_flag else "https://api.bybit.com"
+    base_url = _public_base_url(settings)
 
     symbol = (args.symbol or "BTCUSDT").strip().upper()
     category = (args.category or "linear").strip()
@@ -176,6 +183,157 @@ def cmd_get_state(args: argparse.Namespace) -> int:
     }
 
     res = ControllerResult(ok=True, command="get_state", ts=_utc_iso(), data=data)
+    _print_json(asdict(res))
+    return 0
+
+
+def _parse_kline_list(raw: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Bybit v5 market/kline returns list items like:
+    [ startTime, open, high, low, close, volume, turnover ]
+    """
+    out: List[Dict[str, Any]] = []
+    data = (raw or {}).get("data") if isinstance(raw, dict) else None
+    if not isinstance(data, dict):
+        return out
+    result = data.get("result") or {}
+    lst = result.get("list") or []
+    if not isinstance(lst, list):
+        return out
+
+    for item in lst:
+        if not isinstance(item, list) or len(item) < 7:
+            continue
+        try:
+            ts_ms = int(item[0])
+            o = float(item[1]); h = float(item[2]); l = float(item[3]); c = float(item[4])
+            v = float(item[5]); t = float(item[6])
+        except Exception:
+            continue
+        out.append({
+            "ts_ms": ts_ms,
+            "open": o, "high": h, "low": l, "close": c,
+            "volume": v, "turnover": t,
+        })
+    # API commonly returns newest-first; sort oldest->newest for analysis
+    out.sort(key=lambda x: x["ts_ms"])
+    return out
+
+
+def cmd_get_candles(args: argparse.Namespace) -> int:
+    settings = _load_settings_summary()
+    base_url = _public_base_url(settings)
+
+    symbol = (args.symbol or "BTCUSDT").strip().upper()
+    category = (args.category or "linear").strip()
+    interval = str(args.interval or "15").strip()
+    limit = int(args.limit or 200)
+    if limit < 1:
+        limit = 1
+    if limit > 1000:
+        limit = 1000  # bybit limit guard
+
+    url = f"{base_url}/v5/market/kline?category={category}&symbol={symbol}&interval={interval}&limit={limit}"
+    raw = _http_get_json(url)
+    candles = _parse_kline_list(raw)
+
+    data: Dict[str, Any] = {
+        "mode": "read_only",
+        "note": "Public read-only candles (kline). No auth. No orders.",
+        "settings": settings,
+        "public": {
+            "base_url": base_url,
+            "kline": raw,
+        },
+        "query": {"category": category, "symbol": symbol, "interval": interval, "limit": limit},
+        "candles_count": len(candles),
+        "candles": candles,
+    }
+
+    res = ControllerResult(ok=True, command="get_candles", ts=_utc_iso(), data=data)
+    _print_json(asdict(res))
+    return 0
+
+
+def _compute_sma(values: "list[float]", period: int) -> Optional[float]:
+    if period <= 0 or len(values) < period:
+        return None
+    window = values[-period:]
+    return float(sum(window) / period)
+
+
+def _compute_rsi_wilder(closes: "list[float]", period: int = 14) -> Optional[float]:
+    if period <= 0 or len(closes) < period + 1:
+        return None
+    # Wilder RSI using pandas if available for stability
+    try:
+        import pandas as pd  # type: ignore
+
+        s = pd.Series(closes, dtype="float64")
+        delta = s.diff()
+        gain = delta.clip(lower=0.0)
+        loss = (-delta).clip(lower=0.0)
+
+        # Wilder smoothing
+        avg_gain = gain.ewm(alpha=1/period, adjust=False).mean()
+        avg_loss = loss.ewm(alpha=1/period, adjust=False).mean()
+
+        rs = avg_gain / avg_loss.replace({0.0: float("nan")})
+        rsi = 100.0 - (100.0 / (1.0 + rs))
+        last = float(rsi.iloc[-1])
+        if last != last:  # NaN check
+            return None
+        return last
+    except Exception:
+        return None
+
+
+def cmd_analyze(args: argparse.Namespace) -> int:
+    settings = _load_settings_summary()
+    base_url = _public_base_url(settings)
+
+    symbol = (args.symbol or "BTCUSDT").strip().upper()
+    category = (args.category or "linear").strip()
+    interval = str(args.interval or "15").strip()
+    limit = int(args.limit or 200)
+    if limit < 50:
+        limit = 50
+    if limit > 1000:
+        limit = 1000
+
+    url = f"{base_url}/v5/market/kline?category={category}&symbol={symbol}&interval={interval}&limit={limit}"
+    raw = _http_get_json(url)
+    candles = _parse_kline_list(raw)
+
+    closes = [c["close"] for c in candles]
+    sma20 = _compute_sma(closes, 20)
+    sma50 = _compute_sma(closes, 50)
+    rsi14 = _compute_rsi_wilder(closes, 14)
+
+    last = candles[-1] if candles else None
+    data: Dict[str, Any] = {
+        "mode": "read_only",
+        "note": "Analysis is computed from public candles only. No auth. No orders.",
+        "settings": settings,
+        "public": {
+            "base_url": base_url,
+            "kline": {
+                "ok": raw.get("ok") if isinstance(raw, dict) else False,
+                "status": raw.get("status") if isinstance(raw, dict) else None,
+                "url": raw.get("url") if isinstance(raw, dict) else url,
+            },
+        },
+        "query": {"category": category, "symbol": symbol, "interval": interval, "limit": limit},
+        "candles_count": len(candles),
+        "last_candle": last,
+        "indicators": {
+            "sma20": sma20,
+            "sma50": sma50,
+            "rsi14": rsi14,
+        },
+    }
+
+    res = ControllerResult(ok=True, command="analyze", ts=_utc_iso(), data=data)
     _print_json(asdict(res))
     return 0
 
@@ -235,6 +393,20 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--symbol", default="BTCUSDT", help="ticker symbol (default BTCUSDT)")
     s.add_argument("--category", default="linear", help="bybit category (default linear)")
     s.set_defaults(func=cmd_get_state)
+
+    c = sub.add_parser("get_candles", help="public read-only candles (kline)")
+    c.add_argument("--symbol", default="BTCUSDT", help="ticker symbol (default BTCUSDT)")
+    c.add_argument("--category", default="linear", help="bybit category (default linear)")
+    c.add_argument("--interval", default="15", help="kline interval (e.g. 1,3,5,15,30,60,240, D)")
+    c.add_argument("--limit", type=int, default=200, help="number of candles (max 1000)")
+    c.set_defaults(func=cmd_get_candles)
+
+    a = sub.add_parser("analyze", help="compute SMA/RSI from public candles (read-only)")
+    a.add_argument("--symbol", default="BTCUSDT", help="ticker symbol (default BTCUSDT)")
+    a.add_argument("--category", default="linear", help="bybit category (default linear)")
+    a.add_argument("--interval", default="15", help="kline interval (e.g. 1,3,5,15,30,60,240, D)")
+    a.add_argument("--limit", type=int, default=200, help="number of candles (min 50, max 1000)")
+    a.set_defaults(func=cmd_analyze)
 
     d = sub.add_parser("dry_run", help="simulate an order intent (no execution)")
     d.add_argument("--symbol", required=True, help="e.g. BTCUSDT")
