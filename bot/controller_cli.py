@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-Minimal Controller CLI (Phase 0B)
+Minimal Controller CLI (Phase 0B/0C)
 - healthcheck: runtime/import/config check
 - get_state: READ-ONLY public Bybit GETs (no auth, no orders)
 - get_candles: READ-ONLY public Bybit Kline (no auth, no orders)
 - analyze: READ-ONLY technical analysis on public candles (SMA/RSI), no trading
+- get_private_state: READ-ONLY private Testnet state (balance/positions) - NO ORDERS
 - dry_run: validate + log an order intent (no execution)
 """
 
@@ -60,6 +61,7 @@ def _load_settings_summary() -> Dict[str, Any]:
             "DRY_RUN": _safe_bool_env("DRY_RUN"),
             "EXECUTE": _safe_bool_env("EXECUTE"),
             "TESTNET": _safe_bool_env("TESTNET"),
+            "BYBIT_TESTNET": _safe_bool_env("BYBIT_TESTNET"),
         },
         "secrets_present": {
             "BYBIT_API_KEY": bool(os.getenv("BYBIT_API_KEY")),
@@ -91,14 +93,16 @@ def _load_settings_summary() -> Dict[str, Any]:
 
 
 def _public_base_url(settings: Dict[str, Any]) -> str:
-    # Decide public base URL (no auth)
     testnet_flag = None
     for key in ("bybit_testnet", "testnet"):
         if isinstance(settings.get(key), bool):
             testnet_flag = settings.get(key)
             break
+
     if testnet_flag is None:
-        testnet_flag = settings.get("env_flags", {}).get("TESTNET") is True
+        # fallback to env flags
+        env_flags = settings.get("env_flags", {}) if isinstance(settings.get("env_flags"), dict) else {}
+        testnet_flag = (env_flags.get("TESTNET") is True) or (env_flags.get("BYBIT_TESTNET") is True)
 
     return "https://api-testnet.bybit.com" if testnet_flag else "https://api.bybit.com"
 
@@ -147,7 +151,6 @@ def cmd_healthcheck(_: argparse.Namespace) -> int:
         "imports": {},
     }
 
-    # Import probes (may have side effects in legacy modules; still useful)
     for mod in ["bot", "bot.config", "bot.run"]:
         try:
             __import__(mod)
@@ -188,10 +191,6 @@ def cmd_get_state(args: argparse.Namespace) -> int:
 
 
 def _parse_kline_list(raw: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """
-    Bybit v5 market/kline returns list items like:
-    [ startTime, open, high, low, close, volume, turnover ]
-    """
     out: List[Dict[str, Any]] = []
     data = (raw or {}).get("data") if isinstance(raw, dict) else None
     if not isinstance(data, dict):
@@ -215,7 +214,6 @@ def _parse_kline_list(raw: Dict[str, Any]) -> List[Dict[str, Any]]:
             "open": o, "high": h, "low": l, "close": c,
             "volume": v, "turnover": t,
         })
-    # API commonly returns newest-first; sort oldest->newest for analysis
     out.sort(key=lambda x: x["ts_ms"])
     return out
 
@@ -228,10 +226,7 @@ def cmd_get_candles(args: argparse.Namespace) -> int:
     category = (args.category or "linear").strip()
     interval = str(args.interval or "15").strip()
     limit = int(args.limit or 200)
-    if limit < 1:
-        limit = 1
-    if limit > 1000:
-        limit = 1000  # bybit limit guard
+    limit = max(1, min(limit, 1000))
 
     url = f"{base_url}/v5/market/kline?category={category}&symbol={symbol}&interval={interval}&limit={limit}"
     raw = _http_get_json(url)
@@ -241,10 +236,7 @@ def cmd_get_candles(args: argparse.Namespace) -> int:
         "mode": "read_only",
         "note": "Public read-only candles (kline). No auth. No orders.",
         "settings": settings,
-        "public": {
-            "base_url": base_url,
-            "kline": raw,
-        },
+        "public": {"base_url": base_url, "kline": raw},
         "query": {"category": category, "symbol": symbol, "interval": interval, "limit": limit},
         "candles_count": len(candles),
         "candles": candles,
@@ -265,23 +257,18 @@ def _compute_sma(values: "list[float]", period: int) -> Optional[float]:
 def _compute_rsi_wilder(closes: "list[float]", period: int = 14) -> Optional[float]:
     if period <= 0 or len(closes) < period + 1:
         return None
-    # Wilder RSI using pandas if available for stability
     try:
         import pandas as pd  # type: ignore
-
         s = pd.Series(closes, dtype="float64")
         delta = s.diff()
         gain = delta.clip(lower=0.0)
         loss = (-delta).clip(lower=0.0)
-
-        # Wilder smoothing
         avg_gain = gain.ewm(alpha=1/period, adjust=False).mean()
         avg_loss = loss.ewm(alpha=1/period, adjust=False).mean()
-
         rs = avg_gain / avg_loss.replace({0.0: float("nan")})
         rsi = 100.0 - (100.0 / (1.0 + rs))
         last = float(rsi.iloc[-1])
-        if last != last:  # NaN check
+        if last != last:
             return None
         return last
     except Exception:
@@ -296,10 +283,7 @@ def cmd_analyze(args: argparse.Namespace) -> int:
     category = (args.category or "linear").strip()
     interval = str(args.interval or "15").strip()
     limit = int(args.limit or 200)
-    if limit < 50:
-        limit = 50
-    if limit > 1000:
-        limit = 1000
+    limit = max(50, min(limit, 1000))
 
     url = f"{base_url}/v5/market/kline?category={category}&symbol={symbol}&interval={interval}&limit={limit}"
     raw = _http_get_json(url)
@@ -309,8 +293,8 @@ def cmd_analyze(args: argparse.Namespace) -> int:
     sma20 = _compute_sma(closes, 20)
     sma50 = _compute_sma(closes, 50)
     rsi14 = _compute_rsi_wilder(closes, 14)
-
     last = candles[-1] if candles else None
+
     data: Dict[str, Any] = {
         "mode": "read_only",
         "note": "Analysis is computed from public candles only. No auth. No orders.",
@@ -326,16 +310,130 @@ def cmd_analyze(args: argparse.Namespace) -> int:
         "query": {"category": category, "symbol": symbol, "interval": interval, "limit": limit},
         "candles_count": len(candles),
         "last_candle": last,
-        "indicators": {
-            "sma20": sma20,
-            "sma50": sma50,
-            "rsi14": rsi14,
-        },
+        "indicators": {"sma20": sma20, "sma50": sma50, "rsi14": rsi14},
     }
 
     res = ControllerResult(ok=True, command="analyze", ts=_utc_iso(), data=data)
     _print_json(asdict(res))
     return 0
+
+
+def cmd_get_private_state(args: argparse.Namespace) -> int:
+    """
+    Private READ-ONLY Testnet state. NO ORDERS.
+    Requires BYBIT_API_KEY + BYBIT_API_SECRET in env (.env loaded by your app, or exported).
+    """
+    settings_summary = _load_settings_summary()
+
+    # hard gate: secrets must be present
+    if not settings_summary.get("secrets_present", {}).get("BYBIT_API_KEY") or not settings_summary.get("secrets_present", {}).get("BYBIT_API_SECRET"):
+        res = ControllerResult(
+            ok=False,
+            command="get_private_state",
+            ts=_utc_iso(),
+            data={
+                "mode": "read_only_private",
+                "note": "Missing BYBIT_API_KEY/BYBIT_API_SECRET. Add them to local .env (do NOT commit).",
+                "settings": settings_summary,
+            },
+            error="MissingSecrets: BYBIT_API_KEY/BYBIT_API_SECRET not set",
+        )
+        _print_json(asdict(res))
+        return 2
+
+    # derive testnet flag
+    testnet_flag = None
+    for key in ("bybit_testnet", "testnet"):
+        if isinstance(settings_summary.get(key), bool):
+            testnet_flag = settings_summary.get(key)
+            break
+    if testnet_flag is None:
+        env_flags = settings_summary.get("env_flags", {}) if isinstance(settings_summary.get("env_flags"), dict) else {}
+        testnet_flag = (env_flags.get("TESTNET") is True) or (env_flags.get("BYBIT_TESTNET") is True)
+
+    category = (args.category or "linear").strip()
+    symbol = (args.symbol or "").strip().upper() or None
+
+    # import + create client
+    try:
+        from pybit.unified_trading import HTTP  # type: ignore
+    except Exception as e:
+        res = ControllerResult(
+            ok=False,
+            command="get_private_state",
+            ts=_utc_iso(),
+            data={"mode": "read_only_private", "settings": settings_summary},
+            error=f"ImportError: pybit not available: {type(e).__name__}: {e}",
+        )
+        _print_json(asdict(res))
+        return 2
+
+    try:
+        api_key = os.getenv("BYBIT_API_KEY", "")
+        api_secret = os.getenv("BYBIT_API_SECRET", "")
+        client = HTTP(timeout=20, api_key=api_key, api_secret=api_secret, testnet=bool(testnet_flag))
+
+        # READ-ONLY calls
+        wallet_raw = client.get_wallet_balance(accountType="UNIFIED")
+        pos_kwargs = {"category": category}
+        if symbol:
+            pos_kwargs["symbol"] = symbol
+        positions_raw = client.get_positions(**pos_kwargs)
+
+        # Summaries (avoid dumping full payload by default)
+        def _ret(x): return {"retCode": x.get("retCode"), "retMsg": x.get("retMsg")}
+
+        wallet_sum = _ret(wallet_raw)
+        positions_sum = _ret(positions_raw)
+
+        # Extract minimal numbers if present
+        wallet_result = (wallet_raw.get("result") or {})
+        # Typically: result -> list[0] -> totalEquity/availableBalance etc. (structure varies)
+        total_equity = None
+        available_balance = None
+        try:
+            lst = wallet_result.get("list") or []
+            if lst and isinstance(lst, list):
+                item0 = lst[0] if isinstance(lst[0], dict) else {}
+                total_equity = item0.get("totalEquity") or item0.get("totalEquityUsd") or None
+                available_balance = item0.get("totalAvailableBalance") or item0.get("availableBalance") or None
+        except Exception:
+            pass
+
+        pos_list = (((positions_raw.get("result") or {}).get("list")) or [])
+        pos_count = len(pos_list) if isinstance(pos_list, list) else None
+
+        data = {
+            "mode": "read_only_private",
+            "note": "Private state read-only. No orders. No secrets in output.",
+            "settings": settings_summary,
+            "testnet": bool(testnet_flag),
+            "query": {"category": category, "symbol": symbol},
+            "wallet": {
+                **wallet_sum,
+                "total_equity": total_equity,
+                "available_balance": available_balance,
+            },
+            "positions": {
+                **positions_sum,
+                "count": pos_count,
+            },
+        }
+
+        res = ControllerResult(ok=True, command="get_private_state", ts=_utc_iso(), data=data)
+        _print_json(asdict(res))
+        return 0
+
+    except Exception as e:
+        res = ControllerResult(
+            ok=False,
+            command="get_private_state",
+            ts=_utc_iso(),
+            data={"mode": "read_only_private", "settings": settings_summary, "testnet": bool(testnet_flag)},
+            error=f"{type(e).__name__}: {e}",
+        )
+        _print_json(asdict(res))
+        return 2
 
 
 def _validate_side(side: str) -> str:
@@ -407,6 +505,11 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("--interval", default="15", help="kline interval (e.g. 1,3,5,15,30,60,240, D)")
     a.add_argument("--limit", type=int, default=200, help="number of candles (min 50, max 1000)")
     a.set_defaults(func=cmd_analyze)
+
+    pr = sub.add_parser("get_private_state", help="private read-only testnet state (balance/positions) - NO TRADE")
+    pr.add_argument("--category", default="linear", help="bybit category (default linear)")
+    pr.add_argument("--symbol", default="", help="optional symbol filter, e.g. BTCUSDT")
+    pr.set_defaults(func=cmd_get_private_state)
 
     d = sub.add_parser("dry_run", help="simulate an order intent (no execution)")
     d.add_argument("--symbol", required=True, help="e.g. BTCUSDT")
