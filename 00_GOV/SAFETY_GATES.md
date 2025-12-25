@@ -24,7 +24,8 @@ Private (Auth notwendig, aber read-only):
 - Positions (read-only)
 
 ## Verify-Checkliste (muss grün sein)
-### Publicython bot/controller_cli.py get_state --symbol BTCUSDT --category linear`
+### Public Testnet
+- `python bot/controller_cli.py get_state --symbol BTCUSDT --category linear`
 - `python bot/controller_cli.py get_candles --symbol BTCUSDT --category linear --interval 15 --limit 5`
 - `python bot/controller_cli.py analyze --symbol BTCUSDT --category linear --interval 15 --limit 200`
 Erwartung: HTTP 200, JSON Output, kein Crash.
