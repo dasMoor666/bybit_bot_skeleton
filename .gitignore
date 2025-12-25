@@ -40,5 +40,9 @@ autorun.out
 00_GOV/.gitignore.before_fix_*
 
 # runs: artifacts (keep folder, ignore contents)
- /runs/*
+/runs/*
+!/runs/.gitkeep
+
+# runs: artifacts (ignore contents, keep folder)
+/runs/*
 !/runs/.gitkeep
