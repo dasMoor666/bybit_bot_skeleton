@@ -456,6 +456,34 @@ def _validate_qty(qty: float) -> float:
     return float(qty)
 
 
+
+def cmd_place_order(args: argparse.Namespace) -> int:
+    """BLOCKED in Phase 0: Order execution is disabled (NO-TRADE)."""
+    intent = {
+        "symbol": getattr(args, "symbol", None),
+        "category": getattr(args, "category", None),
+        "side": getattr(args, "side", None),
+        "qty": getattr(args, "qty", None),
+    }
+
+    data: Dict[str, Any] = {
+        "mode": "blocked",
+        "note": "place_order is disabled in Phase 0 (NO-TRADE). Use dry_run for intent simulation.",
+        "intent": intent,
+        "settings": _load_settings_summary(),
+        "safety_gates_file": "00_GOV/SAFETY_GATES.md",
+    }
+
+    res = ControllerResult(
+        ok=False,
+        command="place_order",
+        ts=_utc_iso(),
+        data=data,
+        error="GateClosed: order execution disabled",
+    )
+    _print_json(asdict(res))
+    return 2
+
 def cmd_dry_run(args: argparse.Namespace) -> int:
     try:
         symbol = _validate_symbol(args.symbol)
@@ -510,6 +538,14 @@ def build_parser() -> argparse.ArgumentParser:
     pr.add_argument("--category", default="linear", help="bybit category (default linear)")
     pr.add_argument("--symbol", default="", help="optional symbol filter, e.g. BTCUSDT")
     pr.set_defaults(func=cmd_get_private_state)
+
+    # BLOCKED order command (Phase 0: NO-TRADE)
+    p_s = sub.add_parser("place_order", help="(BLOCKED) execution stub; always blocks in Phase 0")
+    p_s.add_argument("--symbol", required=True, help="ticker symbol, e.g. BTCUSDT")
+    p_s.add_argument("--category", default="linear", help="bybit category (default linear)")
+    p_s.add_argument("--side", required=True, choices=["Buy", "Sell"], help="Buy|Sell")
+    p_s.add_argument("--qty", required=True, type=float, help="order quantity (blocked)")
+    p_s.set_defaults(func=cmd_place_order)
 
     d = sub.add_parser("dry_run", help="simulate an order intent (no execution)")
     d.add_argument("--symbol", required=True, help="e.g. BTCUSDT")
