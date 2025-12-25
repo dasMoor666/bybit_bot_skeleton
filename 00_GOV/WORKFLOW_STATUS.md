@@ -18,7 +18,7 @@
 - Befehle:
   - `python -m py_compile bot/controller_cli.py`
   - `python bot/controller_cli.py get_state --symbol BTCUSDT --category linear`
-  -t/controller_cli.py get_candles --symbol BTCUSDT --category linear --interval 15 --limit 5`
+  - `python bot/controller_cli.py get_candles --symbol BTCUSDT --category linear --interval 15 --limit 5`
   - `python bot/controller_cli.py analyze --symbol BTCUSDT --category linear --interval 15 --limit 200`
   - `set -a; source .env; set +a; python bot/controller_cli.py get_private_state --category linear --symbol BTCUSDT`
   - `python bot/controller_cli.py place_order --symbol BTCUSDT --side Buy --qty 0.001`  # MUSS blocken (GateClosed)
@@ -54,7 +54,9 @@
 - Private (requires .env locally):
   - `set -a; source .env; set +a; python bot/controller_cli.py get_private_state --category linear --symbol BTCUSDT`
 - Erwartung:
-  - `retCode=0` bei wallet + posSafety Gate (NO-TRADE)
+  - `retCode=0` bei wallet + pos
+
+## Safety Gate (NO-TRADE) (NO-TRADE)
 - `python bot/controller_cli.py place_order --symbol BTCUSDT --side Buy --qty 0.001`
 - Erwartung:
   - `"error": "GateClosed: ..."` und kein Crash
