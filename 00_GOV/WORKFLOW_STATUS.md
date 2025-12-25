@@ -39,3 +39,11 @@
 ## Blocker / Risiken
 - Import-Side-Effects in Legacy-Modulen möglich (z.B. Logs beim Import) → später entkoppeln
 - Live-Trading bleibt gesperrt, bis Safety-Gathriftlich erfüllt sind
+
+## Verify — Testnet Connectivity (Public + Private, read-only)
+- Public:
+  - `python bot/controller_cli.py get_state --symbol BTCUSDT --category linear`
+- Private (requires .env locally):
+  - `set -a; source .env; set +a; python bot/controller_cli.py get_private_state --category linear --symbol BTCUSDT`
+- Erwartung:
+  - retCode=0 bei wallet + positions
