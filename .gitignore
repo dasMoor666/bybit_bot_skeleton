@@ -38,3 +38,7 @@ autorun.out
 00_GOV/.gitignore.backup_*
 00_GOV/snapshot_*.txt
 00_GOV/.gitignore.before_fix_*
+
+# runs: artifacts (keep folder, ignore contents)
+ /runs/*
+!/runs/.gitkeep
