@@ -578,3 +578,9 @@ COMMAND_RUNNERS = {
 
 from src.controller.commands import get_state as _cmd_get_state  # noqa: E402
 from src.controller.commands import analyze as _cmd_analyze  # noqa: E402
+
+from src.controller.commands import get_private_state as _cmd_get_private_state  # noqa: E402
+
+from src.controller.commands import dry_run as _cmd_dry_run  # noqa: E402
+
+from src.controller.commands import place_order as _cmd_place_order  # noqa: E402
