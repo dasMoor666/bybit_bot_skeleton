@@ -51,7 +51,7 @@ class ControllerResult:
 
 def _load_settings_summary() -> Dict[str, Any]:
     """
-    Tries to load bot.config.Settings if available.
+    Tries to load src.controller.config.Settings if available.
     Never returns secrets, only presence flags and harmless metadata.
     """
     summary: Dict[str, Any] = {
@@ -72,10 +72,10 @@ def _load_settings_summary() -> Dict[str, Any]:
     }
 
     try:
-        from bot.config import Settings  # type: ignore
+        from src.controller.config import Settings  # type: ignore
         s = Settings()
         summary["config_loaded"] = True
-        summary["settings_class"] = "bot.config.Settings"
+        summary["settings_class"] = "src.controller.config.Settings"
 
         # only harmless fields if they exist
         for field in [
@@ -151,7 +151,7 @@ def cmd_healthcheck(_: argparse.Namespace) -> int:
         "imports": {},
     }
 
-    for mod in ["bot", "bot.config", "bot.run"]:
+    for mod in ["src", "src.controller", "src.controller.config"]:
         try:
             __import__(mod)
             data["imports"][mod] = True

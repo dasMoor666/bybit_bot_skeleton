@@ -4,7 +4,7 @@ import json, subprocess, time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from bot.analysis import compute_indicators, simple_signal
+from src.controller.analysis import compute_indicators, simple_signal
 
 def utc_ts() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00","Z")
@@ -21,7 +21,7 @@ def main():
     interval = "15"
     limit = "200"
 
-    out = sh(["python", "bot/controller_cli.py", "get_candles",
+    out = sh(["python","-m","src.controller","get_candles",
               "--symbol", symbol, "--category", category,
               "--interval", interval, "--limit", limit])
 
