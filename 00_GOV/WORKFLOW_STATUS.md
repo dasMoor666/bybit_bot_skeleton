@@ -60,3 +60,12 @@
 - `python bot/controller_cli.py place_order --symbol BTCUSDT --side Buy --qty 0.001`
 - Erwartung:
   - `"error": "GateClosed: ..."` und kein Crash
+
+## 2026-01-01T21:30:01Z
+- Mode: TESTNET / DRY_RUN
+- Changed: repo structure prepared (src/), legacy parked, gitignore hardened
+- Last verify:
+  - python -m py_compile bot/config.py bot/controller_cli.py bot/exchange_utils.py
+  - python -m py_compile src/controller/config.py src/controller/cli.py src/exchange/bybit/client.py
+- Next: switch entrypoint to src/controller and decompose scripts -> ops/ + controller/commands
+
