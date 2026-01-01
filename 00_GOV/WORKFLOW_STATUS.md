@@ -69,3 +69,11 @@
   - python -m py_compile src/controller/config.py src/controller/cli.py src/exchange/bybit/client.py
 - Next: switch entrypoint to src/controller and decompose scripts -> ops/ + controller/commands
 
+
+## 2026-01-01T21:37:59Z
+- Mode: TESTNET / DRY_RUN
+- Changed: mirrored scripts/loop_dry_run.py -> src/controller/orchestration/loop_dry_run.py (no behavior change), added ops/run_loop_dry_run.sh wrapper
+- Verify:
+  - python -m py_compile src/controller/orchestration/loop_dry_run.py
+- Next: refactor loop to import from src.controller.* (config/audit/state), then deprecate scripts/ entrypoints
+
