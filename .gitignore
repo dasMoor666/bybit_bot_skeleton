@@ -46,3 +46,6 @@ autorun.out
 # runs: artifacts (ignore contents, keep folder)
 /runs/*
 !/runs/.gitkeep
+.idea/
+_audit/
+reports/
