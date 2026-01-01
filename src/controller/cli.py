@@ -575,3 +575,6 @@ COMMAND_RUNNERS = {
     "healthcheck": _cmd_healthcheck.run,
     "get_candles": _cmd_get_candles.run,
 }
+
+from src.controller.commands import get_state as _cmd_get_state  # noqa: E402
+from src.controller.commands import analyze as _cmd_analyze  # noqa: E402
