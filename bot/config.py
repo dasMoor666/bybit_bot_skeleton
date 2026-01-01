@@ -3,8 +3,8 @@ from pydantic import Field
 
 class Settings(BaseSettings):
     # === Bybit API (Testnet) ===
-    bybit_api_key: str = Field("", env="REDACTED_BYBIT_API_KEY")
-    bybit_api_secret: str = Field("", env="REDACTED_BYBIT_API_SECRET")
+    bybit_api_key: str = Field("", env="BYBIT_API_KEY")
+    bybit_api_secret: str = Field("", env="BYBIT_API_SECRET")
     bybit_testnet: bool = Field(True, env="BYBIT_TESTNET")
 
     # === Trading Setup ===
