@@ -565,3 +565,13 @@ def main(argv: Optional[list[str]] = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+# === Command routing (Phase 0) ===
+from src.controller.commands import healthcheck as _cmd_healthcheck  # noqa: E402
+from src.controller.commands import get_candles as _cmd_get_candles  # noqa: E402
+
+COMMAND_RUNNERS = {
+    "healthcheck": _cmd_healthcheck.run,
+    "get_candles": _cmd_get_candles.run,
+}
